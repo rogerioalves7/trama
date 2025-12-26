@@ -2,24 +2,22 @@ from pathlib import Path
 import os
 import dj_database_url
 from datetime import timedelta
+from dotenv import load_dotenv
 
 # 1. Caminhos Base
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# 2. Segurança e Ambiente
-# Tenta pegar do ambiente, se não achar, usa chave de dev
+# 2. Carregar variáveis de ambiente locais (.env)
+load_dotenv()
+
+# 3. Segurança e Ambiente
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-chave-padrao-desenvolvimento')
-
-# Define o ambiente. Se não definido no Render, assume development
 ENVIRONMENT = os.environ.get('ENVIRONMENT', 'development')
-
-# Debug é True apenas se NÃO for produção
 DEBUG = (ENVIRONMENT == 'development')
 
-# No Render, permitimos todos os hosts
 ALLOWED_HOSTS = ['*']
 
-# 3. Aplicações Instaladas
+# 4. Aplicações Instaladas
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -28,20 +26,21 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    # Third-party Apps
+    # Libs de terceiros
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
 
-    # Nossos Apps
+    # Nossos Apps (Apenas os que existem de verdade)
     'finance',
     'inventory',
+    # 'sales', <--- REMOVIDO: As vendas estão dentro de 'finance'
 ]
 
-# 4. Middleware
+# 5. Middleware
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware', # Essencial para Render
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -71,8 +70,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-# 5. Banco de Dados
-# Tenta pegar DATABASE_URL do Render/Supabase. Se falhar, usa SQLite.
+# 6. Banco de Dados
 DATABASES = {
     'default': dj_database_url.config(
         default='sqlite:///' + str(BASE_DIR / 'db.sqlite3'),
@@ -81,7 +79,7 @@ DATABASES = {
     )
 }
 
-# 6. Validação de Senha
+# 7. Validação de Senha
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
     {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
@@ -89,23 +87,23 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# 7. Internacionalização
+# 8. Internacionalização
 LANGUAGE_CODE = 'pt-br'
 TIME_ZONE = 'America/Sao_Paulo'
 USE_I18N = True
 USE_TZ = True
 
-# 8. Arquivos Estáticos (WhiteNoise)
+# 9. Estáticos
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# 9. Configuração CORS
+# 10. CORS
 CORS_ALLOW_ALL_ORIGINS = True 
 
-# 10. Configuração DRF e JWT
+# 11. DRF e JWT
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
