@@ -1,21 +1,21 @@
 import { useEffect, useState } from 'react'
 import { 
-  CurrencyDollarIcon, ShoppingBagIcon, ArrowTrendingUpIcon, ExclamationTriangleIcon,
+  CurrencyDollarIcon, ArrowTrendingUpIcon, ExclamationTriangleIcon,
   TrophyIcon, ChartBarIcon, CalendarDaysIcon, XMarkIcon
 } from '@heroicons/react/24/outline'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../api'
 
-// --- MODAL ADAPTADO ---
+// --- MODAL (Mantido igual) ---
 const DetailModal = ({ isOpen, onClose, title, data, type }) => {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg animate-fade-in max-h-[80vh] flex flex-col transition-colors">
-        <div className="flex justify-between items-center p-4 border-b dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg animate-fade-in max-h-[80vh] flex flex-col transition-colors border border-gray-200 dark:border-gray-700">
+        <div className="flex justify-between items-center p-4 border-b border-gray-100 dark:border-gray-700">
           <h3 className="text-lg font-bold text-gray-800 dark:text-white">{title}</h3>
-          <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-gray-400 hover:text-gray-200"/></button>
+          <button onClick={onClose}><XMarkIcon className="w-6 h-6 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"/></button>
         </div>
         
         <div className="overflow-y-auto p-4 flex-1">
@@ -24,7 +24,7 @@ const DetailModal = ({ isOpen, onClose, title, data, type }) => {
           ) : (
             <ul className="space-y-3">
               {data.map((item, idx) => (
-                <li key={idx} className="flex justify-between items-center border-b dark:border-gray-700 pb-2 last:border-0">
+                <li key={idx} className="flex justify-between items-center border-b border-gray-100 dark:border-gray-700 pb-2 last:border-0">
                   <div>
                     {type === 'stock' && (
                         <>
@@ -51,8 +51,8 @@ const DetailModal = ({ isOpen, onClose, title, data, type }) => {
           )}
         </div>
         
-        <div className="p-4 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900 rounded-b-lg text-right">
-            <button onClick={onClose} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 rounded text-sm font-bold text-gray-700 dark:text-white">Fechar</button>
+        <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 rounded-b-lg text-right">
+            <button onClick={onClose} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-600 dark:hover:bg-gray-500 rounded text-sm font-bold text-gray-700 dark:text-white transition">Fechar</button>
         </div>
       </div>
     </div>
@@ -77,10 +77,9 @@ function Dashboard() {
   }
 
   if (loading || !stats) {
-    return <div className="flex justify-center items-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div></div>
+    return <div className="flex justify-center items-center h-full"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-indigo-400"></div></div>
   }
 
-  // Estilo do Tooltip do Gráfico (Para Dark Mode)
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
@@ -107,79 +106,110 @@ function Dashboard() {
         {/* CARD VENDAS HOJE */}
         <div 
             onClick={() => openModal('Vendas de Hoje', stats.sales_today_list, 'sales')}
-            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border-l-4 border-indigo-500 flex items-center justify-between cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1"
+            className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border-l-4 border-indigo-500 cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1 flex flex-col justify-between h-44"
         >
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Vendas Hoje</p>
-            <p className="text-2xl font-bold text-gray-800 dark:text-white">
-              R$ {parseFloat(stats.sales_today).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-xs text-indigo-400 mt-1 underline">Ver detalhes</p>
+          <div className="flex justify-between items-start">
+            <div>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Vendas Hoje (Bruto)</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">
+                R$ {parseFloat(stats.sales_today).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                
+                {/* LINHA DE TAXAS */}
+                {stats.sales_today_fees > 0 && (
+                    <p className="text-xs text-red-500 font-medium mt-1">
+                        Taxas: -R$ {parseFloat(stats.sales_today_fees).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                )}
+            </div>
+            <div className="bg-indigo-50 dark:bg-indigo-900/30 p-3 rounded-full text-indigo-600 dark:text-indigo-400">
+                <CurrencyDollarIcon className="w-6 h-6" />
+            </div>
           </div>
-          <div className="bg-indigo-50 dark:bg-gray-700 p-3 rounded-full text-indigo-600 dark:text-indigo-400">
-            <CurrencyDollarIcon className="w-6 h-6" />
+          
+          <div className="mt-auto">
+             <p className="text-xs text-indigo-500 dark:text-indigo-400 underline font-medium">Ver detalhes</p>
           </div>
         </div>
 
         {/* CARD VENDAS MÊS */}
         <div 
             onClick={() => openModal('Últimas Vendas do Mês', stats.sales_month_list, 'sales')}
-            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border-l-4 border-green-500 flex items-center justify-between cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1"
+            className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border-l-4 border-green-500 cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1 flex flex-col justify-between h-44"
         >
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Vendas Mês</p>
-            <p className="text-2xl font-bold text-gray-800 dark:text-white">
-              R$ {parseFloat(stats.sales_month).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </p>
-            <p className="text-xs text-green-400 mt-1 underline">Ver últimas</p>
+          <div className="flex justify-between items-start">
+            <div>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Vendas Mês (Bruto)</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">
+                R$ {parseFloat(stats.sales_month).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+
+                {/* LINHA DE TAXAS */}
+                {stats.sales_month_fees > 0 && (
+                    <p className="text-xs text-red-500 font-medium mt-1">
+                        Taxas: -R$ {parseFloat(stats.sales_month_fees).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                )}
+            </div>
+            <div className="bg-green-50 dark:bg-green-900/30 p-3 rounded-full text-green-600 dark:text-green-400">
+                <ArrowTrendingUpIcon className="w-6 h-6" />
+            </div>
           </div>
-          <div className="bg-green-50 dark:bg-gray-700 p-3 rounded-full text-green-600 dark:text-green-400">
-            <ArrowTrendingUpIcon className="w-6 h-6" />
+
+          <div className="mt-auto">
+            <p className="text-xs text-green-500 dark:text-green-400 underline font-medium">Ver últimas</p>
           </div>
         </div>
 
         {/* CARD ESTOQUE */}
         <div 
             onClick={() => openModal('Produtos com Estoque Crítico', stats.low_stock_list, 'stock')}
-            className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border-l-4 border-red-500 flex items-center justify-between cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1"
+            className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border-l-4 border-red-500 cursor-pointer hover:shadow-lg transition transform hover:-translate-y-1 flex flex-col justify-between h-44"
         >
-          <div>
-            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Estoque Crítico</p>
-            <p className="text-2xl font-bold text-gray-800 dark:text-white">
-              {stats.low_stock_count} <span className="text-sm font-normal text-gray-400">itens</span>
-            </p>
-            <p className="text-xs text-red-400 mt-1 underline">Ver produtos</p>
+          <div className="flex justify-between items-start">
+            <div>
+                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Estoque Crítico</p>
+                <p className="text-2xl font-bold text-gray-800 dark:text-white mt-1">
+                {stats.low_stock_count} <span className="text-sm font-normal text-gray-400">itens</span>
+                </p>
+            </div>
+            <div className="bg-red-50 dark:bg-red-900/30 p-3 rounded-full text-red-600 dark:text-red-400">
+                <ExclamationTriangleIcon className="w-6 h-6" />
+            </div>
           </div>
-          <div className="bg-red-50 dark:bg-gray-700 p-3 rounded-full text-red-600 dark:text-red-400">
-            <ExclamationTriangleIcon className="w-6 h-6" />
+
+          <div className="mt-auto">
+            <p className="text-xs text-red-500 dark:text-red-400 underline font-medium">Ver produtos</p>
           </div>
         </div>
 
         {/* CARD PREVISÃO */}
-        <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border-l-4 border-orange-400 flex flex-col justify-center">
+        <div className="bg-white dark:bg-gray-800 p-5 rounded-xl shadow-sm border-l-4 border-orange-400 flex flex-col justify-between h-44">
             <div className="flex items-center gap-2 mb-2">
                 <CalendarDaysIcon className="w-5 h-5 text-orange-500" />
                 <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Previsão Futura</p>
             </div>
+            
             <div className="space-y-1">
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs md:text-sm">
                     <span className="text-gray-600 dark:text-gray-300">A Receber:</span>
                     <span className="font-bold text-green-600 dark:text-green-400">
                         + {parseFloat(stats.future_in).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                 </div>
-                <div className="flex justify-between text-sm">
+                <div className="flex justify-between text-xs md:text-sm">
                     <span className="text-gray-600 dark:text-gray-300">A Pagar:</span>
                     <span className="font-bold text-red-600 dark:text-red-400">
                         - {parseFloat(stats.future_out).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                 </div>
-                <div className="border-t dark:border-gray-700 mt-1 pt-1 flex justify-between text-sm font-bold">
-                    <span className="dark:text-white">Projeção:</span>
-                    <span className={(stats.future_in - stats.future_out) >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600 dark:text-red-400'}>
-                        R$ {(stats.future_in - stats.future_out).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                </div>
+            </div>
+
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-2 flex justify-between text-sm font-bold mt-auto">
+                <span className="dark:text-white">Projeção:</span>
+                <span className={(stats.future_in - stats.future_out) >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-red-600 dark:text-red-400'}>
+                    R$ {(stats.future_in - stats.future_out).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
             </div>
         </div>
 
@@ -187,7 +217,7 @@ function Dashboard() {
 
       {/* ÁREA DE GRÁFICOS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-100 dark:border-gray-700 flex flex-col h-96">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-96 transition-colors">
             <div className="flex items-center gap-2 mb-6">
                 <ChartBarIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 <h3 className="text-gray-700 dark:text-gray-200 font-bold">Desempenho (7 dias - Pagos)</h3>
@@ -195,7 +225,7 @@ function Dashboard() {
             <div className="flex-1 w-full text-xs">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={stats.sales_history} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" opacity={0.2} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#374151" opacity={0.1} />
                         <XAxis dataKey="date" tick={{fill: '#9CA3AF'}} axisLine={false} tickLine={false} />
                         <YAxis tickFormatter={(val) => `R$ ${val}`} tick={{fill: '#9CA3AF'}} axisLine={false} tickLine={false} width={60} />
                         <Tooltip content={<CustomTooltip />} cursor={{fill: 'rgba(255,255,255,0.05)'}} />
@@ -205,14 +235,14 @@ function Dashboard() {
             </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-100 dark:border-gray-700 flex flex-col h-96">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col h-96 transition-colors">
             <div className="flex items-center gap-2 mb-4">
                 <TrophyIcon className="w-5 h-5 text-yellow-500" />
                 <h3 className="text-gray-700 dark:text-gray-200 font-bold">Top Produtos</h3>
             </div>
             <div className="flex-1 overflow-y-auto scrollbar-thin">
                 <table className="min-w-full">
-                    <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                    <thead className="bg-gray-50 dark:bg-gray-700/50 sticky top-0">
                         <tr>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Produto</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Qtd</th>

@@ -8,6 +8,8 @@ from datetime import timedelta
 from decimal import Decimal
 
 # Importação dos Modelos
+# Nota: Certifique-se de que Sale e SaleItem estão acessíveis aqui. 
+# Se estiverem em outro app (ex: sales), ajuste para: from sales.models import Sale, SaleItem
 from .models import PaymentMethod, Sale, SaleItem, FinancialTransaction, BusinessSettings
 from inventory.models import Product
 
@@ -25,7 +27,7 @@ class SaleViewSet(viewsets.ModelViewSet):
     1. Verifica estoque.
     2. Cria a venda e os itens.
     3. Baixa o estoque.
-    4. Gera o lançamento financeiro (Receita).
+    4. Gera o lançamento financeiro (Receita Líquida - descontando taxas).
     """
     queryset = Sale.objects.all().order_by('-created_at')
     serializer_class = SaleSerializer
@@ -39,7 +41,7 @@ class SaleViewSet(viewsets.ModelViewSet):
                 items_data = serializer.validated_data.pop('items')
                 sale_data = serializer.validated_data
                 
-                # ... (Lógica de verificação de estoque mantém igual) ...
+                # Verificação de Estoque
                 for item in items_data:
                     product = item['product'] 
                     qty = item['quantity']
@@ -49,7 +51,7 @@ class SaleViewSet(viewsets.ModelViewSet):
 
                 sale = Sale.objects.create(**sale_data)
 
-                # ... (Lógica de baixar estoque mantém igual) ...
+                # Baixa de Estoque e Criação dos Itens
                 for item in items_data:
                     product = item['product']
                     qty = item['quantity']
@@ -57,14 +59,16 @@ class SaleViewSet(viewsets.ModelViewSet):
                     SaleItem.objects.create(sale=sale, product=product, quantity=qty, unit_price=price)
                     Product.objects.filter(id=product.id).update(stock_quantity=F('stock_quantity') - qty)
 
-                # --- LÓGICA FINANCEIRA ATUALIZADA ---
+                # --- LÓGICA FINANCEIRA ---
                 method = sale.payment_method
                 method_name = method.name.lower()
                 
                 # 1. Calcular o valor LÍQUIDO (descontando a taxa)
-                tax_rate = method.tax_rate or Decimal(0)
+                # Se não houver taxa definida, assume 0
+                tax_rate = method.tax_rate if hasattr(method, 'tax_rate') and method.tax_rate else Decimal(0)
+                
                 fee_amount = sale.total_amount * (tax_rate / Decimal(100))
-                net_amount = sale.total_amount - fee_amount # Valor que realmente entra
+                net_amount = sale.total_amount - fee_amount # Valor que entra no caixa
                 
                 # 2. Definir datas e status
                 trans_status = 'PAID'
@@ -75,18 +79,17 @@ class SaleViewSet(viewsets.ModelViewSet):
                     trans_status = 'PENDING'
                     due_date = sale.created_at.date() + timedelta(days=30)
                 
-                # 3. Criar Transação com valor LÍQUIDO e nota sobre a taxa
+                # 3. Criar Transação com valor LÍQUIDO
                 description = f"Venda #{sale.id}"
                 if sale.customer_name:
                     description += f" - {sale.customer_name}"
                 
-                # Se teve taxa, adiciona na descrição para conferência
                 if fee_amount > 0:
                     description += f" (Taxa {tax_rate}%: -R${fee_amount:.2f})"
 
                 FinancialTransaction.objects.create(
                     description=description,
-                    amount=net_amount, # <--- Usamos o valor com desconto
+                    amount=net_amount, # Salva o valor líquido
                     type='REVENUE',
                     sale=sale,
                     date=sale.created_at.date(),
@@ -128,59 +131,96 @@ class BusinessSettingsViewSet(viewsets.ModelViewSet):
     serializer_class = BusinessSettingsSerializer
 
 class DashboardStatsView(APIView):
+    """
+    Fornece os KPIs para o Dashboard.
+    """
     def get(self, request):
-        today = timezone.now().date()
+        # CORREÇÃO AQUI:
+        # Convertemos o horário atual (UTC) para o horário local configurado no settings
+        # antes de extrair a data. Isso garante que 23h ainda seja "hoje".
+        now = timezone.localtime(timezone.now())
+        today = now.date()
+        
         first_day_month = today.replace(day=1)
 
-        # 1. Vendas Hoje (Lista e Total)
-        sales_today_qs = FinancialTransaction.objects.filter(type='REVENUE', date=today, sale__isnull=False)
-        sales_today_total = sales_today_qs.aggregate(total=Sum('amount'))['total'] or 0
-        # Serializamos manualmente a lista para o detalhe
-        sales_today_list = sales_today_qs.values('id', 'description', 'amount', 'sale__customer_name')
+        # --- 1. VENDAS (Baseado no modelo Sale = Valor Bruto) ---
+        sales_today_qs = Sale.objects.filter(created_at__date=today)
+        sales_month_qs = Sale.objects.filter(created_at__date__gte=first_day_month)
 
-        # 2. Vendas Mês (Total e Top 10 recentes)
-        sales_month_qs = FinancialTransaction.objects.filter(type='REVENUE', date__gte=first_day_month, sale__isnull=False)
-        sales_month_total = sales_month_qs.aggregate(total=Sum('amount'))['total'] or 0
-        sales_month_list = sales_month_qs.order_by('-date', '-created_at')[:10].values('id', 'date', 'amount', 'sale__customer_name')
+        # Totais Brutos
+        sales_today_total = sales_today_qs.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+        sales_month_total = sales_month_qs.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
 
-        # 3. Saldo Real (Apenas o que já foi PAGO/RECEBIDO)
-        total_revenue = FinancialTransaction.objects.filter(type='REVENUE', status='PAID').aggregate(total=Sum('amount'))['total'] or 0
-        total_expense = FinancialTransaction.objects.filter(type='EXPENSE', status='PAID').aggregate(total=Sum('amount'))['total'] or 0
-        balance = total_revenue - total_expense
+        # Cálculo das Taxas
+        sales_today_fees = sum(
+            sale.total_amount * (sale.payment_method.tax_rate / Decimal(100)) 
+            for sale in sales_today_qs if hasattr(sale.payment_method, 'tax_rate') and sale.payment_method.tax_rate
+        )
 
-        # 4. Estoque Crítico (Lista)
+        sales_month_fees = sum(
+            sale.total_amount * (sale.payment_method.tax_rate / Decimal(100)) 
+            for sale in sales_month_qs if hasattr(sale.payment_method, 'tax_rate') and sale.payment_method.tax_rate
+        )
+
+        # Listas para detalhamento (Modal)
+        sales_today_list = [
+            {
+                "id": s.id, 
+                "amount": s.total_amount, 
+                "description": s.created_at.astimezone().strftime('%H:%M'), # .astimezone() garante hora local na string
+                "sale__customer_name": s.customer_name
+            } 
+            for s in sales_today_qs.order_by('-created_at')
+        ]
+        
+        sales_month_list = [
+            {
+                "id": s.id, 
+                "amount": s.total_amount, 
+                "description": s.created_at.astimezone().strftime('%d/%m'), 
+                "sale__customer_name": s.customer_name
+            } 
+            for s in sales_month_qs.order_by('-created_at')[:10]
+        ]
+
+        # --- 2. FINANCEIRO ---
+        future_in = FinancialTransaction.objects.filter(type='REVENUE', status='PENDING').aggregate(total=Sum('amount'))['total'] or 0
+        future_out = FinancialTransaction.objects.filter(type='EXPENSE', status='PENDING').aggregate(total=Sum('amount'))['total'] or 0
+
+        # --- 3. ESTOQUE ---
         low_stock_qs = Product.objects.filter(stock_quantity__lte=5)
         low_stock_count = low_stock_qs.count()
         low_stock_list = low_stock_qs.values('id', 'name', 'stock_quantity')
 
-        # 5. Previsão Futura (Transações PENDENTES)
-        future_in = FinancialTransaction.objects.filter(type='REVENUE', status='PENDING').aggregate(total=Sum('amount'))['total'] or 0
-        future_out = FinancialTransaction.objects.filter(type='EXPENSE', status='PENDING').aggregate(total=Sum('amount'))['total'] or 0
-
-        # Gráficos e Top Produtos (Mantidos da versão anterior)
+        # --- 4. GRÁFICO (Últimos 7 dias - Vendas Brutas) ---
         sales_history = []
         for i in range(6, -1, -1):
-            date_check = today - timedelta(days=i)
-            total = FinancialTransaction.objects.filter(type='REVENUE', date=date_check, status='PAID').aggregate(t=Sum('amount'))['t'] or 0
-            sales_history.append({"date": date_check.strftime("%d/%m"), "value": total})
+            day = today - timedelta(days=i)
+            total = Sale.objects.filter(created_at__date=day).aggregate(t=Sum('total_amount'))['t'] or 0
+            sales_history.append({"date": day.strftime("%d/%m"), "value": total})
 
-        top_products_qs = SaleItem.objects.values('product__name').annotate(total_qty=Sum('quantity')).order_by('-total_qty')[:5]
+        # --- 5. TOP PRODUTOS ---
+        top_products_qs = SaleItem.objects.filter(sale__created_at__date__gte=first_day_month)\
+            .values('product__name')\
+            .annotate(total_qty=Sum('quantity'))\
+            .order_by('-total_qty')[:5]
+        
         top_products = [{"name": i['product__name'], "quantity": i['total_qty']} for i in top_products_qs]
 
         return Response({
             "sales_today": sales_today_total,
-            "sales_today_list": list(sales_today_list),
+            "sales_today_fees": sales_today_fees,
+            "sales_today_list": sales_today_list,
             
             "sales_month": sales_month_total,
-            "sales_month_list": list(sales_month_list),
-            
-            "balance": balance,
-            
-            "low_stock_count": low_stock_count,
-            "low_stock_list": list(low_stock_list),
+            "sales_month_fees": sales_month_fees,
+            "sales_month_list": sales_month_list,
             
             "future_in": future_in,
             "future_out": future_out,
+            
+            "low_stock_count": low_stock_count,
+            "low_stock_list": list(low_stock_list),
             
             "sales_history": sales_history,
             "top_products": top_products
