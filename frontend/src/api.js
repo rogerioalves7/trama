@@ -3,7 +3,7 @@ import axios from 'axios'
 // Cria uma instância do Axios com seleção automática de ambiente
 const api = axios.create({
   // Tenta pegar a URL da Vercel (Render). Se não existir, usa localhost.
-  baseURL: 'https://trama-wxgr.onrender.com/api' || 'http://127.0.0.1:8000/api/',
+  baseURL: import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api/',
 })
 
 // INTERCEPTADOR DE REQUISIÇÃO
