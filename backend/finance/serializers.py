@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import PaymentMethod, Sale, SaleItem, FinancialTransaction, BusinessSettings
 from inventory.models import Product
+from django.contrib.auth.models import User
 
 class PaymentMethodSerializer(serializers.ModelSerializer):
     class Meta:
@@ -47,3 +48,35 @@ class BusinessSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = BusinessSettings
         fields = '__all__'
+    
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        # Adicionamos 'first_name' e 'last_name' na lista
+        fields = ['id', 'username', 'email', 'password', 'first_name', 'last_name']
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data.get('email', ''),
+            password=validated_data['password'],
+            # Salvamos os nomes passados
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', '')
+        )
+        return user
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'password']
+        # Garante que a senha só pode ser escrita, nunca lida (segurança)
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        # O create_user é obrigatório para criptografar a senha corretamente
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data.get('email', ''),
+            password=validated_data['password']
+        )
+        return user

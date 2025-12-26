@@ -1,20 +1,27 @@
 from rest_framework import viewsets, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
+# Importação da Permissão (A correção do erro está aqui)
+from rest_framework.permissions import IsAuthenticated 
 from django.db import transaction
 from django.db.models import F, Sum
 from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
 
-# Importação dos Modelos
-# Nota: Certifique-se de que Sale e SaleItem estão acessíveis aqui. 
-# Se estiverem em outro app (ex: sales), ajuste para: from sales.models import Sale, SaleItem
+# Importação dos Modelos (Incluindo User do Django)
+from django.contrib.auth.models import User
 from .models import PaymentMethod, Sale, SaleItem, FinancialTransaction, BusinessSettings
 from inventory.models import Product
 
 # Importação dos Serializers
-from .serializers import PaymentMethodSerializer, SaleSerializer, FinancialTransactionSerializer, BusinessSettingsSerializer
+from .serializers import (
+    PaymentMethodSerializer, 
+    SaleSerializer, 
+    FinancialTransactionSerializer, 
+    BusinessSettingsSerializer,
+    UserSerializer
+)
 
 class PaymentMethodViewSet(viewsets.ModelViewSet):
     queryset = PaymentMethod.objects.all()
@@ -64,7 +71,6 @@ class SaleViewSet(viewsets.ModelViewSet):
                 method_name = method.name.lower()
                 
                 # 1. Calcular o valor LÍQUIDO (descontando a taxa)
-                # Se não houver taxa definida, assume 0
                 tax_rate = method.tax_rate if hasattr(method, 'tax_rate') and method.tax_rate else Decimal(0)
                 
                 fee_amount = sale.total_amount * (tax_rate / Decimal(100))
@@ -130,17 +136,24 @@ class BusinessSettingsViewSet(viewsets.ModelViewSet):
     queryset = BusinessSettings.objects.all()
     serializer_class = BusinessSettingsSerializer
 
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    Gerencia usuários do sistema.
+    """
+    queryset = User.objects.all().order_by('id')
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
 class DashboardStatsView(APIView):
     """
     Fornece os KPIs para o Dashboard.
     """
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
-        # CORREÇÃO AQUI:
-        # Convertemos o horário atual (UTC) para o horário local configurado no settings
-        # antes de extrair a data. Isso garante que 23h ainda seja "hoje".
+        # Timezone fix: Converte UTC para Local antes de pegar a data
         now = timezone.localtime(timezone.now())
         today = now.date()
-        
         first_day_month = today.replace(day=1)
 
         # --- 1. VENDAS (Baseado no modelo Sale = Valor Bruto) ---
@@ -151,7 +164,7 @@ class DashboardStatsView(APIView):
         sales_today_total = sales_today_qs.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
         sales_month_total = sales_month_qs.aggregate(Sum('total_amount'))['total_amount__sum'] or 0
 
-        # Cálculo das Taxas
+        # Cálculo das Taxas (Iterando sobre as vendas)
         sales_today_fees = sum(
             sale.total_amount * (sale.payment_method.tax_rate / Decimal(100)) 
             for sale in sales_today_qs if hasattr(sale.payment_method, 'tax_rate') and sale.payment_method.tax_rate
@@ -167,7 +180,7 @@ class DashboardStatsView(APIView):
             {
                 "id": s.id, 
                 "amount": s.total_amount, 
-                "description": s.created_at.astimezone().strftime('%H:%M'), # .astimezone() garante hora local na string
+                "description": s.created_at.astimezone().strftime('%H:%M'), 
                 "sale__customer_name": s.customer_name
             } 
             for s in sales_today_qs.order_by('-created_at')
@@ -183,7 +196,7 @@ class DashboardStatsView(APIView):
             for s in sales_month_qs.order_by('-created_at')[:10]
         ]
 
-        # --- 2. FINANCEIRO ---
+        # --- 2. FINANCEIRO (Previsão Futura) ---
         future_in = FinancialTransaction.objects.filter(type='REVENUE', status='PENDING').aggregate(total=Sum('amount'))['total'] or 0
         future_out = FinancialTransaction.objects.filter(type='EXPENSE', status='PENDING').aggregate(total=Sum('amount'))['total'] or 0
 

@@ -5,7 +5,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 # Importações dos Apps
 from inventory.views import CategoryViewSet, MaterialViewSet, ProductViewSet, PurchaseViewSet
-from finance.views import PaymentMethodViewSet, SaleViewSet, FinancialTransactionViewSet, BusinessSettingsViewSet, DashboardStatsView
+from finance.views import PaymentMethodViewSet, SaleViewSet, FinancialTransactionViewSet, BusinessSettingsViewSet, DashboardStatsView, UserViewSet
 
 # Configuração do Router Automático
 router = DefaultRouter()
@@ -21,6 +21,7 @@ router.register(r'payment-methods', PaymentMethodViewSet)
 router.register(r'sales', SaleViewSet)
 router.register(r'transactions', FinancialTransactionViewSet)
 router.register(r'settings', BusinessSettingsViewSet)
+router.register(r'users', UserViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -34,4 +35,5 @@ urlpatterns = [
     # Autenticação JWT
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    
 ]
