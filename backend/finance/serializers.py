@@ -5,7 +5,7 @@ from inventory.models import Product
 class PaymentMethodSerializer(serializers.ModelSerializer):
     class Meta:
         model = PaymentMethod
-        fields = '__all__'
+        fields = ['id', 'name', 'tax_rate'] # Adicionado 'tax_rate'
 
 class SaleItemSerializer(serializers.ModelSerializer):
     product_name = serializers.ReadOnlyField(source='product.name')
