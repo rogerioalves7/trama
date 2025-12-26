@@ -1,5 +1,8 @@
 import axios from 'axios'
 
+console.log("Variavel VITE:", import.meta.env.VITE_API_URL)
+console.log("Ambiente:", import.meta.env.MODE)
+
 // Cria uma instância do Axios com seleção automática de ambiente
 const api = axios.create({
   // Tenta pegar a URL da Vercel (Render). Se não existir, usa localhost.
