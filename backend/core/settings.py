@@ -110,3 +110,5 @@ SIMPLE_JWT = {
 }
 
 # Para Forçar o commit
+
+APP_VERSION = '1.0.0'
