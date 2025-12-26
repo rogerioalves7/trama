@@ -108,3 +108,5 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60), # Token vale por 1 hora
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
+
+# Para Forçar o commit
